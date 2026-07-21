@@ -6,6 +6,6 @@
   "far_steps": 550,
   "near_steps": 550,
   "image_size": 28,
-  "seed_count": 10,
+  "seed_count": 3,
   "split_count": 2
 }
