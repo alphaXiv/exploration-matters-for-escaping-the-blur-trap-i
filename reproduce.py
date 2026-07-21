@@ -260,6 +260,8 @@ def train_task(
     image_size: int,
     seed_count: int,
     split_count: int,
+    split_event_fractions: list[float],
+    split_selection: str,
     device: torch.device,
     generator: torch.Generator,
 ) -> dict[str, float]:
@@ -280,7 +282,12 @@ def train_task(
     grad_ema = torch.zeros(scene.count, device=device)
     seed_enabled = task == "far" and condition in {"seed", "both"}
     split_enabled = task == "near" and condition in {"split", "both"}
-    event_steps = {steps // 4, steps // 2, 3 * steps // 4}
+    seed_event_steps = {steps // 4, steps // 2, 3 * steps // 4}
+    split_event_steps = {
+        max(1, min(steps, int(round(steps * fraction))))
+        for fraction in split_event_fractions
+    }
+    selected_split_depths: list[float] = []
     for step in range(steps):
         optimizer.zero_grad(set_to_none=True)
         prediction = scene.render(train_cameras, image_size)
@@ -293,25 +300,32 @@ def train_task(
             if current_grad.shape == grad_ema.shape:
                 grad_ema.mul_(0.92).add_(current_grad, alpha=0.08)
         optimizer.step()
-        if (step + 1) in event_steps:
-            if seed_enabled:
-                add_random_seeds(scene, seed_count, generator)
-                optimizer = make_optimizer(scene)
-                grad_ema = torch.zeros(scene.count, device=device)
-            if task == "near":
-                with torch.no_grad():
-                    scales = scene.log_scales.exp()
-                    if split_enabled:
-                        candidates = torch.topk(scales, k=min(max(split_count * 2, 1), scene.count)).indices
+        if seed_enabled and (step + 1) in seed_event_steps:
+            add_random_seeds(scene, seed_count, generator)
+            optimizer = make_optimizer(scene)
+            grad_ema = torch.zeros(scene.count, device=device)
+        if task == "near" and (step + 1) in split_event_steps:
+            with torch.no_grad():
+                scales = scene.log_scales.exp()
+                if split_enabled:
+                    candidates = torch.topk(scales, k=min(max(split_count * 2, 1), scene.count)).indices
+                    if split_selection == "lowest_grad":
+                        order = torch.argsort(grad_ema[candidates])
+                        chosen = candidates[order[: min(split_count, candidates.numel())]]
+                    elif split_selection == "furthest":
+                        order = torch.argsort(scene.xyz[candidates, 2], descending=True)
+                        chosen = candidates[order[: min(split_count, candidates.numel())]]
+                    else:
                         perm = torch.randperm(candidates.numel(), generator=generator, device=device)
                         chosen = candidates[perm[: min(split_count, candidates.numel())]]
-                    else:
-                        threshold = 7.5e-5
-                        eligible = torch.where((scales > 0.36) & (grad_ema > threshold))[0]
-                        chosen = eligible[:split_count]
-                    scene.split(chosen, generator)
-                    optimizer = make_optimizer(scene)
-                    grad_ema = torch.zeros(scene.count, device=device)
+                else:
+                    threshold = 7.5e-5
+                    eligible = torch.where((scales > 0.36) & (grad_ema > threshold))[0]
+                    chosen = eligible[:split_count]
+                selected_split_depths.extend(float(value) for value in scene.xyz[chosen, 2])
+                scene.split(chosen, generator)
+                optimizer = make_optimizer(scene)
+                grad_ema = torch.zeros(scene.count, device=device)
     with torch.no_grad():
         train_mse = (scene.render(train_cameras, image_size) - train_target).square().mean()
         test_mse = (scene.render(test_cameras, image_size) - test_target).square().mean()
@@ -319,13 +333,16 @@ def train_task(
         effective = int((opacities > 0.05).sum())
         depth = scene.xyz[opacities > 0.05, 2]
         depth_mean = float(depth.mean()) if depth.numel() else float("nan")
-    return {
+    metrics = {
         f"{task}_train_psnr": float(psnr(train_mse)),
         f"{task}_test_psnr": float(psnr(test_mse)),
         f"{task}_gaussians": float(scene.count),
         f"{task}_effective_gaussians": float(effective),
         f"{task}_mean_depth": depth_mean,
     }
+    if task == "near" and selected_split_depths:
+        metrics["near_selected_split_depth_mean"] = statistics.fmean(selected_split_depths)
+    return metrics
 
 
 def summarize(results: list[dict[str, Any]], config: dict[str, Any], elapsed: float) -> dict[str, Any]:
@@ -368,13 +385,17 @@ def main() -> None:
     result.update(
         train_task(
             "far", config["condition"], int(config["far_steps"]), int(config["image_size"]),
-            int(config["seed_count"]), int(config["split_count"]), device, generator,
+            int(config["seed_count"]), int(config["split_count"]),
+            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
+            str(config.get("split_selection", "random")), device, generator,
         )
     )
     result.update(
         train_task(
             "near", config["condition"], int(config["near_steps"]), int(config["image_size"]),
-            int(config["seed_count"]), int(config["split_count"]), device, generator,
+            int(config["seed_count"]), int(config["split_count"]),
+            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
+            str(config.get("split_selection", "random")), device, generator,
         )
     )
     result["elapsed_seconds"] = time.time() - start
