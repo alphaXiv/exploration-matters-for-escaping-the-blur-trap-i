@@ -1,5 +1,5 @@
 {
-  "condition": "graphdeco_fullres_30k_seed_and_split_20",
+  "condition": "graphdeco_fullres_30k_alternating_seed_split_20",
   "suite": "graphdeco",
   "graphdeco_commit": "54c035f7834b564019656c3e3fcc3646292f727d",
   "graphdeco_operator": "both",
