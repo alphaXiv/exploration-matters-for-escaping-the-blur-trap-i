@@ -80,7 +80,9 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         ]
         forced_grads = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         forced_grads[chosen] = 1.0
+        self.tmp_radii = torch.zeros((self.get_xyz.shape[0],), device="cuda")
         self.densify_and_split(forced_grads, 0.5, scene_extent)
+        self.tmp_radii = None
 
 '''
         if "def random_split_explore" not in model_text:
