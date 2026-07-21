@@ -5,6 +5,8 @@
   "graphdeco_dataset_url": "https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip",
   "graphdeco_iterations": 7000,
   "graphdeco_resolution": 4,
+  "graphdeco_operator": "seed",
+  "graphdeco_seed_count": 20,
   "base_seed": 260717965,
   "orthogonality_samples": 32768,
   "attenuation_batches": 96,
