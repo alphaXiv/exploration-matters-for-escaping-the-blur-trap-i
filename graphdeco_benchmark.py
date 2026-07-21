@@ -53,6 +53,16 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         text = text.replace(old_seed, new_seed, 1)
         general_utils.write_text(text)
 
+    # CUDA 12.8's stricter headers no longer make the fixed-width integer
+    # types transitively visible to this upstream header.
+    rasterizer_header = (
+        source / "submodules" / "diff-gaussian-rasterization" /
+        "cuda_rasterizer" / "rasterizer_impl.h"
+    )
+    rasterizer_text = rasterizer_header.read_text()
+    if "#include <cstdint>" not in rasterizer_text:
+        rasterizer_header.write_text("#include <cstdint>\n" + rasterizer_text)
+
     build_env = os.environ.copy()
     build_env["TORCH_CUDA_ARCH_LIST"] = "12.0"
     _run(
