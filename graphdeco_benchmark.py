@@ -134,6 +134,26 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         with zipfile.ZipFile(archive) as handle:
             handle.extractall(data)
         marker.touch()
+
+    # Each pod runs several trials for the same scene against one shared
+    # extracted dataset. Graphdeco lazily creates points3D.ply on first use;
+    # concurrent readers can otherwise observe a partially written PLY.
+    ply_setup = r'''
+import sys
+from pathlib import Path
+from scene.colmap_loader import read_points3D_binary
+from scene.dataset_readers import storePly
+
+for sparse in Path(sys.argv[1]).rglob("sparse"):
+    model = sparse / "0" if (sparse / "0").is_dir() else sparse
+    binary = model / "points3D.bin"
+    ply = model / "points3D.ply"
+    if binary.is_file():
+        xyz, rgb, _ = read_points3D_binary(str(binary))
+        storePly(str(ply), xyz, rgb)
+        print(f"PLY_READY {ply} points={len(xyz)}", flush=True)
+'''
+    _run([sys.executable, "-c", ply_setup, str(data)], cwd=source)
     discovered = sorted(str(path.relative_to(data)) for path in data.rglob("sparse") if path.is_dir())
     print("GRAPHDECO_SETUP_READY commit=" + commit + " sparse_dirs=" + repr(discovered), flush=True)
 
