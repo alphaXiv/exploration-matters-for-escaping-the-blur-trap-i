@@ -69,7 +69,8 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         [
             sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-build-isolation",
             "./submodules/diff-gaussian-rasterization", "./submodules/fused-ssim",
-            "./submodules/simple-knn", "plyfile",
+            "./submodules/simple-knn", "numpy==1.26.4", "plyfile==1.0.3",
+            "opencv-python-headless==4.10.0.84",
         ],
         cwd=source,
         env=build_env,
