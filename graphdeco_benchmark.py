@@ -63,6 +63,64 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
     if "#include <cstdint>" not in rasterizer_text:
         rasterizer_header.write_text("#include <cstdint>\n" + rasterizer_text)
 
+    if config.get("graphdeco_operator") in {"seed", "both"}:
+        model_path = source / "scene" / "gaussian_model.py"
+        model_text = model_path.read_text()
+        marker = "    def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):\n"
+        seed_method = '''    @torch.no_grad()
+    def random_seed_explore(self, count):
+        if count <= 0 or self.get_xyz.shape[0] == 0:
+            return
+        xyz_min = self.get_xyz.detach().amin(dim=0)
+        xyz_max = self.get_xyz.detach().amax(dim=0)
+        new_xyz = xyz_min + torch.rand((count, 3), device="cuda") * (xyz_max - xyz_min)
+        source = torch.randint(0, self.get_xyz.shape[0], (count,), device="cuda")
+        tensors = {
+            "xyz": new_xyz,
+            "f_dc": self._features_dc[source].detach().clone(),
+            "f_rest": self._features_rest[source].detach().clone(),
+            "opacity": self.inverse_opacity_activation(
+                torch.full((count, 1), 0.1, dtype=self._opacity.dtype, device="cuda")
+            ),
+            "scaling": self._scaling[source].detach().clone(),
+            "rotation": self._rotation[source].detach().clone(),
+        }
+        optimizable = self.cat_tensors_to_optimizer(tensors)
+        self._xyz = optimizable["xyz"]
+        self._features_dc = optimizable["f_dc"]
+        self._features_rest = optimizable["f_rest"]
+        self._opacity = optimizable["opacity"]
+        self._scaling = optimizable["scaling"]
+        self._rotation = optimizable["rotation"]
+        self.xyz_gradient_accum = torch.cat(
+            (self.xyz_gradient_accum, torch.zeros((count, 1), device="cuda")), dim=0
+        )
+        self.denom = torch.cat((self.denom, torch.zeros((count, 1), device="cuda")), dim=0)
+        self.max_radii2D = torch.cat(
+            (self.max_radii2D, torch.zeros((count,), device="cuda")), dim=0
+        )
+
+'''
+        if "def random_seed_explore" not in model_text:
+            if marker not in model_text:
+                raise RuntimeError("Graphdeco random-seed insertion marker not found")
+            model_path.write_text(model_text.replace(marker, seed_method + marker, 1))
+
+        train_path = source / "train.py"
+        train_text = train_path.read_text()
+        hook = (
+            "                    gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, "
+            "scene.cameras_extent, size_threshold, radii)\n"
+        )
+        seed_hook = hook + (
+            "                    gaussians.random_seed_explore("
+            "int(os.environ.get('GS_SEED_COUNT', '20')))\n"
+        )
+        if "gaussians.random_seed_explore" not in train_text:
+            if hook not in train_text:
+                raise RuntimeError("Graphdeco training-loop seed hook not found")
+            train_path.write_text(train_text.replace(hook, seed_hook, 1))
+
     if config.get("graphdeco_operator") in {"split", "both"}:
         model_path = source / "scene" / "gaussian_model.py"
         model_text = model_path.read_text()
@@ -196,6 +254,7 @@ def run_graphdeco_trial(
     child_env = os.environ.copy()
     child_env["CUDA_VISIBLE_DEVICES"] = str(local_rank)
     child_env["GS_SEED"] = str(seed)
+    child_env["GS_SEED_COUNT"] = str(config.get("graphdeco_seed_count", 20))
     child_env["GS_SPLIT_COUNT"] = str(config.get("graphdeco_split_count", 20))
     child_env["PYTHONUNBUFFERED"] = "1"
     child_env["PYTHONFAULTHANDLER"] = "1"

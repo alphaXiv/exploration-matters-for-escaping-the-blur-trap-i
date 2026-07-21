@@ -1,8 +1,9 @@
 {
-  "condition": "graphdeco_30k_random_split_20",
+  "condition": "graphdeco_30k_seed_and_split_20",
   "suite": "graphdeco",
   "graphdeco_commit": "54c035f7834b564019656c3e3fcc3646292f727d",
-  "graphdeco_operator": "split",
+  "graphdeco_operator": "both",
+  "graphdeco_seed_count": 20,
   "graphdeco_split_count": 20,
   "graphdeco_dataset_url": "https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip",
   "graphdeco_iterations": 30000,
