@@ -149,6 +149,7 @@ def run_graphdeco_trial(
         sys.executable, "train.py", "-s", str(scene_path), "-m", str(output), "--eval",
         "-r", str(resolution), "--iterations", str(iterations), "--test_iterations", str(iterations),
         "--save_iterations", str(iterations), "--disable_viewer", "--data_device", "cpu",
+        "--densify_grad_threshold", str(config.get("graphdeco_densify_grad_threshold", 0.0002)),
         "--port", str(7000 + rank),
     ]
     child_env = os.environ.copy()
