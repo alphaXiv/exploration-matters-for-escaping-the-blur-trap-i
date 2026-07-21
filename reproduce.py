@@ -261,6 +261,7 @@ def train_task(
     seed_count: int,
     split_count: int,
     split_event_fractions: list[float],
+    split_candidate_multiplier: int,
     device: torch.device,
     generator: torch.Generator,
 ) -> dict[str, float]:
@@ -306,7 +307,10 @@ def train_task(
             with torch.no_grad():
                 scales = scene.log_scales.exp()
                 if split_enabled:
-                    candidates = torch.topk(scales, k=min(max(split_count * 2, 1), scene.count)).indices
+                    candidates = torch.topk(
+                        scales,
+                        k=min(max(split_count * split_candidate_multiplier, 1), scene.count),
+                    ).indices
                     perm = torch.randperm(candidates.numel(), generator=generator, device=device)
                     chosen = candidates[perm[: min(split_count, candidates.numel())]]
                 else:
@@ -373,14 +377,16 @@ def main() -> None:
         train_task(
             "far", config["condition"], int(config["far_steps"]), int(config["image_size"]),
             int(config["seed_count"]), int(config["split_count"]),
-            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])), device, generator,
+            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
+            int(config.get("split_candidate_multiplier", 2)), device, generator,
         )
     )
     result.update(
         train_task(
             "near", config["condition"], int(config["near_steps"]), int(config["image_size"]),
             int(config["seed_count"]), int(config["split_count"]),
-            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])), device, generator,
+            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
+            int(config.get("split_candidate_multiplier", 2)), device, generator,
         )
     )
     result["elapsed_seconds"] = time.time() - start
