@@ -113,7 +113,10 @@ class GaussianScene(nn.Module):
         child_xyz = torch.cat([parent_xyz - offset, parent_xyz + offset], dim=0)
         child_scales = torch.cat([parent_scales, parent_scales], dim=0) / 1.6
         child_colors = torch.cat([colors[indices], colors[indices]], dim=0)
-        child_opacities = torch.cat([opacities[indices], opacities[indices]], dim=0) * 0.72
+        # Standard 3DGS densification copies opacity to split children. Reducing
+        # it here created a transient coverage hole precisely in the occluded
+        # region that the operator is intended to refine.
+        child_opacities = torch.cat([opacities[indices], opacities[indices]], dim=0)
         self.xyz = nn.Parameter(torch.cat([xyz[keep], child_xyz], dim=0))
         self.log_scales = nn.Parameter(torch.cat([scales[keep], child_scales], dim=0).log())
         self.color_logits = nn.Parameter(torch.logit(torch.cat([colors[keep], child_colors], dim=0).clamp(0.01, 0.99)))
