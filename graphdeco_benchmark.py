@@ -63,6 +63,48 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
     if "#include <cstdint>" not in rasterizer_text:
         rasterizer_header.write_text("#include <cstdint>\n" + rasterizer_text)
 
+    if config.get("graphdeco_operator") in {"split", "both"}:
+        model_path = source / "scene" / "gaussian_model.py"
+        model_text = model_path.read_text()
+        marker = "    def densify_and_split(self, grads, grad_threshold, scene_extent, N=2):\n"
+        split_method = '''    @torch.no_grad()
+    def random_split_explore(self, count, scene_extent):
+        if count <= 0 or self.get_xyz.shape[0] == 0:
+            return
+        large = self.get_scaling.max(dim=1).values > self.percent_dense * scene_extent
+        candidates = torch.nonzero(large, as_tuple=False).squeeze(1)
+        if candidates.numel() == 0:
+            return
+        chosen = candidates[
+            torch.randperm(candidates.numel(), device="cuda")[:min(count, candidates.numel())]
+        ]
+        forced_grads = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
+        forced_grads[chosen] = 1.0
+        self.tmp_radii = torch.zeros((self.get_xyz.shape[0],), device="cuda")
+        self.densify_and_split(forced_grads, 0.5, scene_extent)
+        self.tmp_radii = None
+
+'''
+        if "def random_split_explore" not in model_text:
+            if marker not in model_text:
+                raise RuntimeError("Graphdeco random-split insertion marker not found")
+            model_path.write_text(model_text.replace(marker, split_method + marker, 1))
+
+        train_path = source / "train.py"
+        train_text = train_path.read_text()
+        hook = (
+            "                    gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, "
+            "scene.cameras_extent, size_threshold, radii)\n"
+        )
+        split_hook = hook + (
+            "                    gaussians.random_split_explore("
+            "int(os.environ.get('GS_SPLIT_COUNT', '20')), scene.cameras_extent)\n"
+        )
+        if "gaussians.random_split_explore" not in train_text:
+            if hook not in train_text:
+                raise RuntimeError("Graphdeco training-loop split hook not found")
+            train_path.write_text(train_text.replace(hook, split_hook, 1))
+
     build_env = os.environ.copy()
     build_env["TORCH_CUDA_ARCH_LIST"] = "12.0"
     _run(
@@ -134,6 +176,7 @@ def run_graphdeco_trial(
     child_env = os.environ.copy()
     child_env["CUDA_VISIBLE_DEVICES"] = str(local_rank)
     child_env["GS_SEED"] = str(seed)
+    child_env["GS_SPLIT_COUNT"] = str(config.get("graphdeco_split_count", 20))
     child_env["PYTHONUNBUFFERED"] = "1"
     print(
         f"GRAPHDECO_START rank={rank} local_rank={local_rank} scene={scene_name} "
