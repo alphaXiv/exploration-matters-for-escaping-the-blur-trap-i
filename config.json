@@ -1,5 +1,5 @@
 {
-  "condition": "baseline",
+  "condition": "seed",
   "base_seed": 260717965,
   "orthogonality_samples": 32768,
   "attenuation_batches": 96,
