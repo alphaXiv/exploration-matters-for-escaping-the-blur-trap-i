@@ -80,7 +80,14 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         ]
         forced_grads = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         forced_grads[chosen] = 1.0
-        self.densify_and_split(forced_grads, 0.5, scene_extent)
+        # The pinned upstream densify_and_prune clears tmp_radii before this
+        # exploration hook. Its reusable split primitive still expects that
+        # transient buffer while it appends and prunes points.
+        self.tmp_radii = self.max_radii2D.detach().clone()
+        try:
+            self.densify_and_split(forced_grads, 0.5, scene_extent)
+        finally:
+            self.tmp_radii = None
 
 '''
         if "def random_split_explore" not in model_text:
