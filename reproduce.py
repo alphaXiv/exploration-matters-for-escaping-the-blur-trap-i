@@ -17,6 +17,8 @@ import torch
 import torch.distributed as dist
 from torch import Tensor, nn
 
+from graphdeco_benchmark import run_graphdeco_trial
+
 
 def logit(x: float) -> float:
     return math.log(x / (1.0 - x))
@@ -380,24 +382,27 @@ def main() -> None:
     generator = torch.Generator(device=device).manual_seed(seed)
     start = time.time()
     result: dict[str, Any] = {"rank": rank, "seed": seed}
-    result.update(projection_orthogonality(device, int(config["orthogonality_samples"]), generator))
-    result.update(blending_attenuation(device, int(config["attenuation_batches"]), generator))
-    result.update(
-        train_task(
-            "far", config["condition"], int(config["far_steps"]), int(config["image_size"]),
-            int(config["seed_count"]), int(config["split_count"]),
-            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
-            str(config.get("split_selection", "random")), device, generator,
+    if config.get("suite") == "graphdeco":
+        result.update(run_graphdeco_trial(config, rank, local_rank, world_size, seed))
+    else:
+        result.update(projection_orthogonality(device, int(config["orthogonality_samples"]), generator))
+        result.update(blending_attenuation(device, int(config["attenuation_batches"]), generator))
+        result.update(
+            train_task(
+                "far", config["condition"], int(config["far_steps"]), int(config["image_size"]),
+                int(config["seed_count"]), int(config["split_count"]),
+                list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
+                str(config.get("split_selection", "random")), device, generator,
+            )
         )
-    )
-    result.update(
-        train_task(
-            "near", config["condition"], int(config["near_steps"]), int(config["image_size"]),
-            int(config["seed_count"]), int(config["split_count"]),
-            list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
-            str(config.get("split_selection", "random")), device, generator,
+        result.update(
+            train_task(
+                "near", config["condition"], int(config["near_steps"]), int(config["image_size"]),
+                int(config["seed_count"]), int(config["split_count"]),
+                list(config.get("split_event_fractions", [0.25, 0.5, 0.75])),
+                str(config.get("split_selection", "random")), device, generator,
+            )
         )
-    )
     result["elapsed_seconds"] = time.time() - start
     print("RANK_RESULT " + json.dumps(result, sort_keys=True), flush=True)
     gathered: list[dict[str, Any] | None] | None = [None] * world_size if rank == 0 else None
@@ -412,6 +417,17 @@ def main() -> None:
         print("\n=== ORX_FINAL_SUMMARY ===")
         print("CONFIG " + json.dumps(config, sort_keys=True))
         print(f"TRIALS {len(complete)}")
+        if config.get("suite") == "graphdeco":
+            for scene in sorted({str(item["graphdeco_scene"]) for item in complete}):
+                scene_rows = [item for item in complete if item["graphdeco_scene"] == scene]
+                scene_psnr = statistics.fmean(float(item["graphdeco_test_psnr"]) for item in scene_rows)
+                scene_std = statistics.stdev(float(item["graphdeco_test_psnr"]) for item in scene_rows)
+                scene_count = statistics.fmean(float(item["graphdeco_gaussians"]) for item in scene_rows)
+                print(
+                    f"SCENE_METRIC scene={scene} trials={len(scene_rows)} "
+                    f"test_psnr_mean={scene_psnr:.6f} test_psnr_std={scene_std:.6f} "
+                    f"gaussians_mean={scene_count:.1f}"
+                )
         for key, value in summary.items():
             if isinstance(value, float):
                 print(f"METRIC {key}={value:.10g}")
