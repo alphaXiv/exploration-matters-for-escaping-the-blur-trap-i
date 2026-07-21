@@ -75,9 +75,11 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         candidates = torch.nonzero(large, as_tuple=False).squeeze(1)
         if candidates.numel() == 0:
             return
-        chosen = candidates[
-            torch.randperm(candidates.numel(), device="cuda")[:min(count, candidates.numel())]
-        ]
+        weights = self.get_scaling.detach().mean(dim=1)[candidates]
+        draw = torch.multinomial(
+            weights, min(count, candidates.numel()), replacement=False
+        )
+        chosen = candidates[draw]
         forced_grads = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         forced_grads[chosen] = 1.0
         self.tmp_radii = torch.zeros((self.get_xyz.shape[0],), device="cuda")
