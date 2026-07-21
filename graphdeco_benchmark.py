@@ -134,6 +134,37 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         with zipfile.ZipFile(archive) as handle:
             handle.extractall(data)
         marker.touch()
+
+    # Multiple fixed-seed trials for the same scene share this node-local data
+    # tree.  Upstream lazily creates points3D.ply inside every training process,
+    # so concurrent readers can observe a partial file and SIGBUS in PlyData.
+    # Publish and validate each PLY serially before releasing the rank barrier.
+    prepare_ply = r'''import os
+import sys
+from pathlib import Path
+from scene.colmap_loader import read_points3D_binary, read_points3D_text
+from scene.dataset_readers import fetchPly, storePly
+
+data_root = Path(sys.argv[1])
+for sparse_root in sorted(data_root.rglob("sparse")):
+    colmap_root = sparse_root / "0"
+    if not colmap_root.is_dir():
+        continue
+    ply_path = colmap_root / "points3D.ply"
+    if not ply_path.exists():
+        bin_path = colmap_root / "points3D.bin"
+        txt_path = colmap_root / "points3D.txt"
+        if bin_path.exists():
+            xyz, rgb, _ = read_points3D_binary(str(bin_path))
+        else:
+            xyz, rgb, _ = read_points3D_text(str(txt_path))
+        temporary = ply_path.with_name(ply_path.name + ".tmp")
+        storePly(str(temporary), xyz, rgb)
+        os.replace(temporary, ply_path)
+    cloud = fetchPly(str(ply_path))
+    print(f"PLY_READY path={ply_path} points={cloud.points.shape[0]}", flush=True)
+'''
+    _run([sys.executable, "-c", prepare_ply, str(data)], cwd=source)
     discovered = sorted(str(path.relative_to(data)) for path in data.rglob("sparse") if path.is_dir())
     print("GRAPHDECO_SETUP_READY commit=" + commit + " sparse_dirs=" + repr(discovered), flush=True)
 
