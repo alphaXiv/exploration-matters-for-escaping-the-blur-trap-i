@@ -1,0 +1,11 @@
+{
+  "condition": "baseline",
+  "base_seed": 260717965,
+  "orthogonality_samples": 32768,
+  "attenuation_batches": 96,
+  "far_steps": 550,
+  "near_steps": 550,
+  "image_size": 28,
+  "seed_count": 10,
+  "split_count": 2
+}
