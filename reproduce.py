@@ -280,7 +280,9 @@ def train_task(
     grad_ema = torch.zeros(scene.count, device=device)
     seed_enabled = task == "far" and condition in {"seed", "both"}
     split_enabled = task == "near" and condition in {"split", "both"}
-    event_steps = {steps // 4, steps // 2, 3 * steps // 4}
+    # A single late event tests the paper's sparse-intervention regime without
+    # repeatedly disrupting already fitted foreground primitives.
+    event_steps = {3 * steps // 4}
     for step in range(steps):
         optimizer.zero_grad(set_to_none=True)
         prediction = scene.render(train_cameras, image_size)

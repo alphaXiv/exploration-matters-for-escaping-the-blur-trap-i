@@ -7,5 +7,5 @@
   "near_steps": 550,
   "image_size": 28,
   "seed_count": 10,
-  "split_count": 2
+  "split_count": 1
 }
