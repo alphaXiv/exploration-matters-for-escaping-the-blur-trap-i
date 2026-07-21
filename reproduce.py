@@ -312,6 +312,9 @@ def train_task(
                     if split_selection == "lowest_grad":
                         order = torch.argsort(grad_ema[candidates])
                         chosen = candidates[order[: min(split_count, candidates.numel())]]
+                    elif split_selection == "furthest":
+                        order = torch.argsort(scene.xyz[candidates, 2], descending=True)
+                        chosen = candidates[order[: min(split_count, candidates.numel())]]
                     else:
                         perm = torch.randperm(candidates.numel(), generator=generator, device=device)
                         chosen = candidates[perm[: min(split_count, candidates.numel())]]
