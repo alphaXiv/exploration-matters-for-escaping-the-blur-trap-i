@@ -8,5 +8,6 @@
   "image_size": 28,
   "seed_count": 10,
   "split_count": 1,
-  "split_event_fractions": [0.25]
+  "split_event_fractions": [0.25],
+  "split_selection": "lowest_grad"
 }
