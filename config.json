@@ -6,7 +6,7 @@
   "far_steps": 550,
   "near_steps": 550,
   "image_size": 28,
-  "seed_count": 5,
+  "seed_count": 10,
   "split_count": 1,
   "split_event_fractions": [0.25],
   "split_selection": "furthest"
