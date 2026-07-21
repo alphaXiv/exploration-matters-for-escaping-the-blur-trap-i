@@ -74,7 +74,11 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
         xyz_min = self.get_xyz.detach().amin(dim=0)
         xyz_max = self.get_xyz.detach().amax(dim=0)
         new_xyz = xyz_min + torch.rand((count, 3), device="cuda") * (xyz_max - xyz_min)
-        source = torch.randint(0, self.get_xyz.shape[0], (count,), device="cuda")
+        # Attribute initialization is not specified by the paper.  Use the
+        # spatially nearest pre-existing Gaussian so a globally sampled probe
+        # starts with locally coherent appearance and scale instead of the
+        # attributes of an unrelated random primitive.
+        source = torch.cdist(new_xyz, self.get_xyz.detach()).argmin(dim=1)
         tensors = {
             "xyz": new_xyz,
             "f_dc": self._features_dc[source].detach().clone(),

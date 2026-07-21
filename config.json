@@ -1,5 +1,5 @@
 {
-  "condition": "graphdeco_fullres_30k_random_seed_20",
+  "condition": "graphdeco_fullres_30k_nearest_source_seed_20",
   "suite": "graphdeco",
   "graphdeco_commit": "54c035f7834b564019656c3e3fcc3646292f727d",
   "graphdeco_dataset_url": "https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip",
