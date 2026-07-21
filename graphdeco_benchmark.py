@@ -183,6 +183,10 @@ def run_graphdeco_trial(
     child_env["GS_SEED"] = str(seed)
     child_env["GS_SPLIT_COUNT"] = str(config.get("graphdeco_split_count", 20))
     child_env["PYTHONUNBUFFERED"] = "1"
+    child_env["PYTHONFAULTHANDLER"] = "1"
+    child_env["OPENBLAS_NUM_THREADS"] = "1"
+    child_env["MKL_NUM_THREADS"] = "1"
+    child_env["NUMEXPR_NUM_THREADS"] = "1"
     print(
         f"GRAPHDECO_START rank={rank} local_rank={local_rank} scene={scene_name} "
         f"seed={seed} iterations={iterations} resolution={resolution}",
@@ -199,7 +203,7 @@ def run_graphdeco_trial(
         timeout=int(config.get("graphdeco_rank_timeout", 10800)),
     )
     elapsed = time.time() - started
-    tail = "\n".join(completed.stdout.splitlines()[-30:])
+    tail = "\n".join(completed.stdout.splitlines()[-240:])
     print(f"GRAPHDECO_TAIL rank={rank}\n{tail}", flush=True)
     if completed.returncode != 0:
         raise RuntimeError(f"Graphdeco rank {rank} failed with {completed.returncode}:\n{tail}")
