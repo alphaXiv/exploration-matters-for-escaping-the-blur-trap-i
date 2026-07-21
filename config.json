@@ -1,5 +1,5 @@
 {
-  "condition": "both",
+  "condition": "split",
   "base_seed": 260717965,
   "orthogonality_samples": 32768,
   "attenuation_batches": 96,
