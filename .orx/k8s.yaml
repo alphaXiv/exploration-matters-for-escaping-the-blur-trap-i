@@ -27,7 +27,10 @@ spec:
         - name: run
           image: nvcr.io/nvidia/pytorch:25.06-py3
           imagePullPolicy: IfNotPresent
-          command: ["bash", "-c", "$ORX_SCRIPT"]
+          # ORX_SCRIPT contains shell syntax (including semicolons). `eval` is
+          # required so bash parses the expanded script instead of treating
+          # punctuation as part of a `set` argument.
+          command: ["bash", "-c", "eval \"$ORX_SCRIPT\""]
           env:
             - name: JOB_COMPLETION_INDEX
               valueFrom:
