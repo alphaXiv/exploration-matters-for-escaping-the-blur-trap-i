@@ -1,5 +1,5 @@
 {
-  "condition": "graphdeco_fullres_30k_random_split_20",
+  "condition": "graphdeco_fullres_30k_random_split_20_seedblock_b",
   "suite": "graphdeco",
   "graphdeco_commit": "54c035f7834b564019656c3e3fcc3646292f727d",
   "graphdeco_operator": "split",
@@ -7,7 +7,7 @@
   "graphdeco_dataset_url": "https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip",
   "graphdeco_iterations": 30000,
   "graphdeco_resolution": 1,
-  "base_seed": 260717965,
+  "base_seed": 260817965,
   "orthogonality_samples": 32768,
   "attenuation_batches": 96,
   "far_steps": 550,
