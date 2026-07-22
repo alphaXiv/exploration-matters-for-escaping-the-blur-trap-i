@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "paperId": "2607.17965",
+  "title": "Exploration and the 3DGS Blur Trap",
+  "description": "Controlled mechanisms reproduce strongly while real-scene split20 gains are small, seed-sensitive, and positive across two independent trial blocks.",
+  "verdict": "partially-reproduced",
+  "reportPath": "reproduction/report.md",
+  "notebookPath": "reproduction/exploration_blur_trap.py",
+  "compute": {
+    "backend": "kubernetes",
+    "gpuModel": "NVIDIA RTX PRO 6000 Blackwell",
+    "gpuCount": 16,
+    "wallHours": 11.840080
+  }
+}
