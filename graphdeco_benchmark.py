@@ -96,8 +96,11 @@ def _prepare_graphdeco(config: dict[str, Any], root: Path) -> None:
             "                    gaussians.densify_and_prune(opt.densify_grad_threshold, 0.005, "
             "scene.cameras_extent, size_threshold, radii)\n"
         )
+        split_start = int(config.get("graphdeco_split_start_iteration", 0))
+        split_end = int(config.get("graphdeco_split_end_iteration", config["graphdeco_iterations"] + 1))
         split_hook = hook + (
-            "                    gaussians.random_split_explore("
+            f"                    if {split_start} <= iteration < {split_end}:\n"
+            "                        gaussians.random_split_explore("
             "int(os.environ.get('GS_SPLIT_COUNT', '20')), scene.cameras_extent)\n"
         )
         if "gaussians.random_split_explore" not in train_text:
